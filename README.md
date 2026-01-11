@@ -2,6 +2,10 @@
 
 A self-contained HTML tool for analyzing and managing Azure RBAC and Entra ID role assignments. This tool allows you to view all users with permissions in your Azure environment and generate cleanup scripts to remove those permissions.
 
+## Original Request
+
+> I am trying to build a self contained tool, preferably in the format of a single HTML file with CSS and Javascript which allows a user to login to Azure/Entra ID and get a list of users with permissions in Azure, directly or indirectly, permanent or on-demand or permissions in Entra ID. I want to show the user a list of users/permissions (permissions may be summarized, e.g. if the user has owner on multiple resource groups just say so with the number of resource groups and no need to specify which resource groups) and allow the user to select users which should be cleaned up (which consists of two actions: remove any role assignments and optionally: remove them from Entra ID), this should be in the form of a script they can copy/paste into something like an Azure cloud shell, so powershell or Azure CLI.
+
 ## Features
 
 - **Single HTML File**: No installation required, just open the HTML file in a browser
