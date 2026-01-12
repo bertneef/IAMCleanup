@@ -263,11 +263,57 @@
         </div>
 
         <div class="content">
+            <div id="configSection" class="auth-section" style="display: none;">
+                <h2>⚙️ Azure AD App Configuration</h2>
+                <p style="margin: 20px 0; color: #666;">Configure your Azure AD application details below.</p>
+
+                <div style="max-width: 600px; margin: 0 auto; text-align: left;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Client ID (Application ID)</label>
+                        <input type="text" id="clientId" class="search-box" placeholder="00000000-0000-0000-0000-000000000000" style="width: 100%;">
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Tenant ID (Directory ID) - Optional</label>
+                        <input type="text" id="tenantId" class="search-box" placeholder="common (or your specific tenant ID)" style="width: 100%;">
+                        <small style="color: #666;">Leave as 'common' for multi-tenant, or enter your specific tenant ID</small>
+                    </div>
+
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button class="btn btn-success" onclick="saveConfigAndSignIn()">Save & Sign In</button>
+                        <button class="btn" onclick="showAuthSection()">Cancel</button>
+                    </div>
+                </div>
+
+                <div class="info" style="margin-top: 30px; text-align: left;">
+                    <strong>📋 How to register an Azure AD application:</strong>
+                    <ol style="margin-left: 20px; margin-top: 10px; line-height: 1.6;">
+                        <li>Go to <a href="https://portal.azure.com/#view/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/~/RegisteredApps" target="_blank">Azure Portal → Azure Active Directory → App registrations</a></li>
+                        <li>Click "New registration"</li>
+                        <li>Name: "Azure Permissions Viewer" (or any name)</li>
+                        <li>Supported account types: "Accounts in this organizational directory only"</li>
+                        <li>Redirect URI: Select "Single-page application (SPA)" and enter the URL where you're hosting this file (or file:/// if running locally)</li>
+                        <li>Click "Register"</li>
+                        <li>Copy the "Application (client) ID" - this is your Client ID</li>
+                        <li>Copy the "Directory (tenant) ID" - this is your Tenant ID</li>
+                        <li>Go to "API permissions" → "Add a permission"</li>
+                        <li>Select "Microsoft Graph" → "Delegated permissions"</li>
+                        <li>Add these permissions: <code>Directory.Read.All</code>, <code>User.Read.All</code>, <code>RoleManagement.Read.Directory</code></li>
+                        <li>Select "Azure Service Management" → "Delegated permissions"</li>
+                        <li>Add: <code>user_impersonation</code></li>
+                        <li>Click "Grant admin consent" (requires admin privileges)</li>
+                    </ol>
+                </div>
+            </div>
+
             <div id="authSection" class="auth-section">
                 <h2>Sign in to Azure</h2>
                 <p style="margin: 20px 0; color: #666;">Click the button below to authenticate with your Azure account.</p>
                 <button class="btn" onclick="signIn()">Sign In with Microsoft</button>
+                <button class="btn" onclick="showConfigSection()" style="background: #6c757d;">⚙️ Configure App</button>
                 <div class="info" style="margin-top: 20px; text-align: left;">
+                    <strong>⚠️ First Time Setup Required:</strong>
+                    <p style="margin: 10px 0;">You need to register your own Azure AD application to use this tool. Click "Configure App" above for instructions.</p>
                     <strong>Required Permissions:</strong>
                     <ul style="margin-left: 20px; margin-top: 10px;">
                         <li>Directory.Read.All (to read Entra ID roles)</li>
@@ -353,12 +399,68 @@
     </div>
 
     <script>
+        // Configuration Management
+        function getStoredConfig() {
+            const clientId = localStorage.getItem('azureClientId');
+            const tenantId = localStorage.getItem('azureTenantId') || 'common';
+            return { clientId, tenantId };
+        }
+
+        function saveConfig(clientId, tenantId) {
+            localStorage.setItem('azureClientId', clientId);
+            localStorage.setItem('azureTenantId', tenantId || 'common');
+        }
+
+        function showConfigSection() {
+            const config = getStoredConfig();
+            document.getElementById('clientId').value = config.clientId || '';
+            document.getElementById('tenantId').value = config.tenantId || 'common';
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('configSection').style.display = 'block';
+        }
+
+        function showAuthSection() {
+            document.getElementById('configSection').style.display = 'none';
+            document.getElementById('authSection').style.display = 'block';
+        }
+
+        function saveConfigAndSignIn() {
+            const clientId = document.getElementById('clientId').value.trim();
+            const tenantId = document.getElementById('tenantId').value.trim() || 'common';
+
+            if (!clientId) {
+                alert('Please enter a Client ID');
+                return;
+            }
+
+            // Validate GUID format
+            const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!guidRegex.test(clientId)) {
+                alert('Please enter a valid Client ID (GUID format)');
+                return;
+            }
+
+            saveConfig(clientId, tenantId);
+
+            // Reload the page to reinitialize MSAL with new config
+            window.location.reload();
+        }
+
         // MSAL Configuration
+        const config = getStoredConfig();
+
+        if (!config.clientId) {
+            // Show config section on first load if no config exists
+            document.addEventListener('DOMContentLoaded', () => {
+                showConfigSection();
+            });
+        }
+
         const msalConfig = {
             auth: {
-                clientId: "04b07795-8ddb-461a-bbee-02f9e1bf7b46", // Azure CLI client ID (publicly known)
-                authority: "https://login.microsoftonline.com/common",
-                redirectUri: window.location.href.split('?')[0]
+                clientId: config.clientId || "00000000-0000-0000-0000-000000000000",
+                authority: `https://login.microsoftonline.com/${config.tenantId}`,
+                redirectUri: window.location.href.split('?')[0].split('#')[0]
             },
             cache: {
                 cacheLocation: "sessionStorage",
@@ -375,18 +477,25 @@
             ]
         };
 
-        const msalInstance = new msal.PublicClientApplication(msalConfig);
+        let msalInstance = null;
         let accessToken = null;
         let graphToken = null;
         let usersData = [];
         let allUsersData = [];
 
         // Initialize MSAL
-        msalInstance.initialize().then(() => {
-            msalInstance.handleRedirectPromise().then(handleResponse).catch(err => {
-                console.error(err);
+        if (config.clientId) {
+            msalInstance = new msal.PublicClientApplication(msalConfig);
+            msalInstance.initialize().then(() => {
+                msalInstance.handleRedirectPromise().then(handleResponse).catch(err => {
+                    console.error(err);
+                    showError("Authentication failed: " + (err.message || err));
+                });
+            }).catch(err => {
+                console.error("MSAL initialization failed:", err);
+                showError("Failed to initialize authentication: " + err.message);
             });
-        });
+        }
 
         function handleResponse(response) {
             if (response !== null) {
@@ -396,6 +505,12 @@
         }
 
         async function signIn() {
+            if (!msalInstance) {
+                showConfigSection();
+                showError("Please configure your Azure AD application first.");
+                return;
+            }
+
             try {
                 await msalInstance.loginRedirect(loginRequest);
             } catch (error) {
@@ -451,11 +566,24 @@
         }
 
         function showError(message) {
-            const mainSection = document.getElementById('mainSection');
+            // Try to find a visible section to show the error
+            let targetSection = document.getElementById('mainSection');
+            if (targetSection.style.display === 'none' || !targetSection.style.display) {
+                targetSection = document.getElementById('authSection').style.display !== 'none'
+                    ? document.getElementById('authSection')
+                    : document.getElementById('configSection');
+            }
+
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error';
             errorDiv.textContent = message;
-            mainSection.insertBefore(errorDiv, mainSection.firstChild);
+
+            if (targetSection.firstChild) {
+                targetSection.insertBefore(errorDiv, targetSection.firstChild);
+            } else {
+                targetSection.appendChild(errorDiv);
+            }
+
             setTimeout(() => errorDiv.remove(), 10000);
         }
 

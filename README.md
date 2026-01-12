@@ -6,9 +6,66 @@ A self-contained HTML tool for analyzing and managing Azure RBAC and Entra ID ro
 
 > I am trying to build a self contained tool, preferably in the format of a single HTML file with CSS and Javascript which allows a user to login to Azure/Entra ID and get a list of users with permissions in Azure, directly or indirectly, permanent or on-demand or permissions in Entra ID. I want to show the user a list of users/permissions (permissions may be summarized, e.g. if the user has owner on multiple resource groups just say so with the number of resource groups and no need to specify which resource groups) and allow the user to select users which should be cleaned up (which consists of two actions: remove any role assignments and optionally: remove them from Entra ID), this should be in the form of a script they can copy/paste into something like an Azure cloud shell, so powershell or Azure CLI.
 
+## 🚀 Quick Start
+
+### Prerequisites
+
+Before using this tool, you need to register an Azure AD application. This is a one-time setup that takes about 5 minutes.
+
+### Step 1: Register Azure AD Application
+
+1. **Go to Azure Portal**: Navigate to [Azure Active Directory → App registrations](https://portal.azure.com/#view/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/~/RegisteredApps)
+
+2. **Create New Registration**:
+   - Click **"New registration"**
+   - **Name**: `Azure Permissions Viewer` (or any name you prefer)
+   - **Supported account types**: Select "Accounts in this organizational directory only" (single tenant)
+   - **Redirect URI**:
+     - Select **"Single-page application (SPA)"** from the dropdown
+     - Enter the URL where you'll host this file
+     - If running locally, use: `file:///C:/path/to/azure-permissions-viewer.html` (Windows) or `file:///Users/path/to/azure-permissions-viewer.html` (Mac/Linux)
+     - Or use: `http://localhost:8000/azure-permissions-viewer.html` if serving locally
+   - Click **"Register"**
+
+3. **Copy Application Details**:
+   - On the Overview page, copy the **"Application (client) ID"** - you'll need this
+   - Copy the **"Directory (tenant) ID"** - you'll need this too
+
+4. **Configure API Permissions**:
+   - Go to **"API permissions"** in the left menu
+   - Click **"Add a permission"**
+   - Select **"Microsoft Graph"** → **"Delegated permissions"**
+   - Search for and add these permissions:
+     - ✅ `Directory.Read.All`
+     - ✅ `User.Read.All`
+     - ✅ `RoleManagement.Read.Directory`
+   - Click **"Add permissions"**
+   - Now click **"Add a permission"** again
+   - Select **"Azure Service Management"** → **"Delegated permissions"**
+   - Add: ✅ `user_impersonation`
+   - Click **"Add permissions"**
+   - Finally, click **"Grant admin consent for [Your Organization]"** (requires admin privileges)
+   - Confirm by clicking **"Yes"**
+
+5. **Verify Authentication Settings**:
+   - Go to **"Authentication"** in the left menu
+   - Under "Implicit grant and hybrid flows", ensure **nothing is checked** (we use PKCE flow)
+   - Under "Advanced settings" → "Allow public client flows", ensure this is set to **"No"**
+
+### Step 2: Configure the Tool
+
+1. Open `azure-permissions-viewer.html` in your web browser
+2. Click **"⚙️ Configure App"**
+3. Enter your **Client ID** (Application ID from step 3)
+4. Enter your **Tenant ID** (Directory ID from step 3), or leave as "common" for multi-tenant
+5. Click **"Save & Sign In"**
+
+The tool will save your configuration in browser local storage, so you only need to do this once per browser.
+
 ## Features
 
 - **Single HTML File**: No installation required, just open the HTML file in a browser
+- **Configurable Authentication**: Use your own Azure AD application for secure authentication
 - **Azure AD Authentication**: Secure login using Microsoft Authentication Library (MSAL.js)
 - **Comprehensive Permission Discovery**:
   - Azure RBAC role assignments across all subscriptions
@@ -26,27 +83,32 @@ A self-contained HTML tool for analyzing and managing Azure RBAC and Entra ID ro
 1. Download or save `azure-permissions-viewer.html` to your computer
 2. Open the file in a modern web browser (Chrome, Edge, Firefox, Safari)
 
-### Step 2: Sign In
+### Step 2: Configure (First Time Only)
 
-1. Click "Sign In with Microsoft"
+If this is your first time using the tool:
+1. Click **"⚙️ Configure App"**
+2. Follow the on-screen instructions to register an Azure AD app (see Quick Start section above)
+3. Enter your Client ID and Tenant ID
+4. Click **"Save & Sign In"**
+
+### Step 3: Sign In
+
+1. Click **"Sign In with Microsoft"**
 2. Authenticate with your Azure account
-3. Grant the requested permissions when prompted:
-   - `Directory.Read.All` - to read Entra ID roles
-   - `User.Read.All` - to read user information
-   - `Reader` access to Azure subscriptions - to read RBAC assignments
+3. Grant the requested permissions when prompted (if not already granted via admin consent)
 
-### Step 3: Review Permissions
+### Step 4: Review Permissions
 
 1. The tool will automatically load all users with permissions
 2. Use the search box to filter users by name, email, or permission type
 3. Review the Azure RBAC and Entra ID roles for each user
 
-### Step 4: Select Users for Cleanup
+### Step 5: Select Users for Cleanup
 
 1. Check the boxes next to users you want to remove
 2. Or use "Select All" to select all users
 
-### Step 5: Configure Cleanup Options
+### Step 6: Configure Cleanup Options
 
 1. Choose script type:
    - **PowerShell (Az module)**: For use with Azure PowerShell
@@ -55,7 +117,7 @@ A self-contained HTML tool for analyzing and managing Azure RBAC and Entra ID ro
    - **Delete users from Entra ID**: Check this to permanently delete users (not just remove permissions)
    - **Include comments**: Add explanatory comments to the script
 
-### Step 6: Copy and Execute Script
+### Step 7: Copy and Execute Script
 
 1. Click "Copy Script to Clipboard"
 2. Open Azure Cloud Shell (https://shell.azure.com) or your local terminal
@@ -81,10 +143,13 @@ To execute the generated cleanup scripts, you need:
 
 ### Authentication
 
-- Uses the publicly-known Azure CLI client ID (`04b07795-8ddb-461a-bbee-02f9e1bf7b46`)
-- All authentication happens through Microsoft's official MSAL.js library
+- Uses your own Azure AD application registration (you control the client ID)
+- All authentication happens through Microsoft's official MSAL.js library (MSAL.js 2.38.1)
+- Uses Authorization Code Flow with PKCE (Proof Key for Code Exchange) for enhanced security
 - Tokens are stored in session storage and cleared when you close the browser
+- Configuration (Client ID and Tenant ID) is stored in browser local storage
 - The tool runs entirely in your browser - no data is sent to third-party servers
+- All API calls go directly to Microsoft Graph and Azure Resource Manager APIs
 
 ### Permissions
 
@@ -104,10 +169,16 @@ To execute the generated cleanup scripts, you need:
 
 ## Troubleshooting
 
-### "Failed to acquire tokens"
+### "AADSTS65002: Consent between first party application..." error
 
-- Ensure you're signed in to Azure
-- Clear browser cache and try again
+This error occurs when trying to use a first-party Microsoft client ID (like the Azure CLI client ID). **Solution**: You must register your own Azure AD application following the Quick Start guide above.
+
+### "Failed to acquire tokens" or "Please configure your Azure AD application first"
+
+- Ensure you have registered an Azure AD application (see Quick Start section)
+- Click "⚙️ Configure App" and enter your Client ID and Tenant ID
+- Verify the redirect URI in your Azure AD app registration matches the URL you're using
+- Clear browser cache and local storage, then try again
 - Check that your account has the required permissions
 
 ### "Failed to fetch subscriptions"
