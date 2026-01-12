@@ -31,7 +31,21 @@ Before using this tool, you need to register an Azure AD application. This is a 
    - On the Overview page, copy the **"Application (client) ID"** - you'll need this
    - Copy the **"Directory (tenant) ID"** - you'll need this too
 
-4. **Configure API Permissions**:
+4. **Configure API Permissions** (Two Options):
+
+   **Option A: User-Delegated Permissions Only (No Admin Consent Required)** ⭐ Recommended
+
+   Skip adding any API permissions in the Azure Portal. The app will request permissions when users sign in, and users will only be able to access data they already have permissions to view through their existing Azure roles.
+
+   - ✅ No admin consent needed
+   - ✅ Each user consents for themselves
+   - ✅ Users can only see what they already have access to
+   - ⚠️ Requires users to have appropriate directory roles (e.g., Global Reader, Directory Readers, Privileged Role Administrator)
+   - ⚠️ If a user lacks permissions, they'll see errors when the tool tries to fetch data
+
+   **Option B: Pre-Approved App Permissions (Admin Consent)**
+
+   If you want to pre-approve permissions for all users:
    - Go to **"API permissions"** in the left menu
    - Click **"Add a permission"**
    - Select **"Microsoft Graph"** → **"Delegated permissions"**
@@ -46,6 +60,8 @@ Before using this tool, you need to register an Azure AD application. This is a 
    - Click **"Add permissions"**
    - Finally, click **"Grant admin consent for [Your Organization]"** (requires admin privileges)
    - Confirm by clicking **"Yes"**
+
+   With this option, users won't see permission consent prompts, but the app can still only access data the user has permissions to view.
 
 5. **Verify Authentication Settings**:
    - Go to **"Authentication"** in the left menu
@@ -126,18 +142,34 @@ If this is your first time using the tool:
 
 ## Required Permissions
 
-To use this tool, your Azure account needs:
+### To View Permissions (Read-Only)
 
-- **Azure RBAC**: `Reader` role at the subscription or management group level
-- **Entra ID**: One of the following roles:
-  - Global Reader
-  - Directory Readers
-  - Or any role with `Directory.Read.All` permission
+Your Azure account needs the following permissions to use this tool:
 
-To execute the generated cleanup scripts, you need:
+**For Entra ID Data:**
+- **Global Reader** (recommended) - Can read all directory data
+- **Directory Readers** - Can read basic directory information
+- **Privileged Role Administrator** - Can read role assignments
+- Or any role with these Microsoft Graph permissions:
+  - `Directory.Read.All`
+  - `User.Read.All`
+  - `RoleManagement.Read.Directory`
 
-- **Azure RBAC**: `User Access Administrator` or `Owner` role
-- **Entra ID**: `User Administrator` or `Global Administrator` role
+**For Azure RBAC Data:**
+- **Reader** role at the subscription or management group level
+- This allows reading role assignments across your Azure resources
+
+**Important Notes:**
+- ✅ With **Option A (User-Delegated)**, the tool uses YOUR existing permissions - no admin approval needed
+- ✅ With **Option B (Pre-Approved)**, an admin grants permissions once for all users
+- ⚠️ Regular users without directory read roles won't be able to see Entra ID permissions (but can still see their Azure RBAC access)
+
+### To Execute Cleanup Scripts
+
+To actually remove permissions and delete users, you need:
+
+- **Azure RBAC**: `User Access Administrator` or `Owner` role (to remove role assignments)
+- **Entra ID**: `User Administrator` or `Global Administrator` role (to delete users)
 
 ## Security Considerations
 
